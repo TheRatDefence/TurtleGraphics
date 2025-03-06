@@ -15,6 +15,14 @@ def turtle_init():
     turtle.hideturtle()
     turtle.tracer(0)
     return t
+
+class Screen:
+    def __init__(self, width, height):
+        turtle.screensize(width,height)
+        self.width = width
+        self.height = height
+        self.aspect = width/height
+
 #3D Face
 class Face:
     def __init__(self, p):
@@ -104,21 +112,24 @@ class Camera:
 #2D Triangle
 class Triangle:
     def __init__(self, face, A: Vec2, B: Vec2, C: Vec2):
-        print("Started def Triangle: ")
+        #print("Started def Triangle: ")
         #Create Turtle and colour
         self.turtle = turtle_init()
 
         #Asign verts
         self.verts = [A,B,C]
-        print(f"\t|Triangle created with\nA = [{A.x},{A.y}]\nB = [{B.x},{B.y}]\nC = [{C.x},{C.y}]")
+        #print(f"\t|Triangle created with\nA = [{A.x},{A.y}]\nB = [{B.x},{B.y}]\nC = [{C.x},{C.y}]")
 
-def calculate_vert(vert, camera):
-    print(f"Started def calculate_vert:")
+def calculate_vert(vert, camera, screen):
+    #print(f"Started def calculate_vert:")
     Px, Py, Pz = vert
+    n = camera.near
+    f = camera.far
+    fov = camera.fov
 
     dX, dY, dZ = 1,1,1
-    print(f"\t| Vert: {vert}")
-    print(f"\t| Camera cords: {camera.x}, {camera.y}, {camera.z}")
+    #print(f"\t| Vert: {vert}")
+    #print(f"\t| Camera cords: {camera.x}, {camera.y}, {camera.z}")
 
 
     dZ = Pz - camera.z
@@ -127,25 +138,30 @@ def calculate_vert(vert, camera):
 
 
     if dY != 0:
-        Yprime = round(camera.near * (dZ / dY),1)
-        Xprime = round(camera.near * (dX / dY),1)
+        Yprime = (screen.aspect * (1/(np.tan(fov/2))) * dZ) / dY
+        Xprime = (screen.aspect * (1/(np.tan(fov/2))) * dX) / dY
         #Xprime = 0
     else:
         Yprime = camera.near
         Xprime = camera.near
 
-
-    print(f"\t| screen-space X,Y = {Xprime, Yprime}")
-    return Vec2(Xprime, Yprime)
+    Zprime = dZ * (f/(f - n)) - ((f * n)/(f - n))
 
 
-def flatten_face(face: Face, camera: Camera): #Returns a Triangle which is sceenspace equivalent of the face
-    points = []
+    #print(f"\t| screen-space X,Y = {Xprime, Yprime}")
+    return Vec3(Xprime, Yprime, Zprime)
+
+
+def flatten_face(face: Face, camera: Camera, screen): #Returns a Triangle which is sceenspace equivalent of the face
+    #print("Started def flatten_face:")
     v = face.verts
+
     #Calculate each vert's screenspace equivalent
-    points = [calculate_vert((v[0,0],v[0,1],v[0,2]), camera),
-              calculate_vert((v[1,0],v[1,1],v[1,2]), camera),
-              calculate_vert((v[2,0],v[2,1],v[2,2]), camera)]
+    points = [calculate_vert((v[0,0],v[0,1],v[0,2]), camera, screen),
+              calculate_vert((v[1,0],v[1,1],v[1,2]), camera, screen),
+              calculate_vert((v[2,0],v[2,1],v[2,2]), camera, screen)]
+
+
 
     return Triangle(face, points[0], points[1], points[2])
 
@@ -199,13 +215,13 @@ points = Mat3([
 
 
 face = Face(points)
-print(f"\t| World space points = \n{face.verts}")
+#print(f"\t| World space points = \n{face.verts}")
 
 
-camera = Camera(0,0,0, 1, 2000, 90)
-print(f"\t| Camera at {camera.x},{camera.y},{camera.z}")
+camera = Camera(0,0,0, 1, 2000, 89)
+#print(f"\t| Camera at {camera.x},{camera.y},{camera.z}")
 
-
+screen = Screen(1000,1000)
 
 
 
@@ -218,7 +234,7 @@ def move_face(face, frame, lastframe):
     x,y = frame
     lx, ly = lastframe
     dx,dy = x - lx, y - ly
-    face.Translate(dx * 0.01, dy * 0.01, 0)
+    face.Translate(dx, 0, dy)
 def rotate_face(face, frame, lastframe):
     x, y = frame
     lx, ly = lastframe
@@ -243,7 +259,7 @@ turtle.getcanvas().bind("<Motion>", on_motion)
 frames = []
 fps = 60
 i = int(0)
-print("Started mainloop:")
+#print("Started mainloop:")
 running = True
 while running:
     i += 1
@@ -251,10 +267,10 @@ while running:
     cords.append((mouse_x, mouse_y))
     if i > 2:
         cords.remove(cords[0])
-        #move_face(face, cords[-1], cords[-2])
+        #rotate_face(face, cords[-1], cords[-2])
 
     #Stores, draws, clears and removes frames
-    frames.append(flatten_face(face, camera))
+    frames.append(flatten_face(face, camera, screen))
     if i > 2:
         frames[1].turtle.clear()
         draw_triangle(frames[2], face)
@@ -265,8 +281,8 @@ while running:
 
     turtle.update()
     if i % 60 == 0:
-        #face.Rotate('y', 1)
-        camera.Translate(0,0,0)
+        face.Rotate('y', 1)
+        #camera.Translate(100,0,0)
         #print(camera.x)
         #camera.Rotate('y', 20)
         end_time = time.time()
