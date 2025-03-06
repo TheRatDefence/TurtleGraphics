@@ -104,77 +104,44 @@ class Camera:
 #2D Triangle
 class Triangle:
     def __init__(self, face, A: Vec2, B: Vec2, C: Vec2):
+        print("Started def Triangle: ")
         #Create Turtle and colour
         self.turtle = turtle_init()
 
         #Asign verts
         self.verts = [A,B,C]
-        print(f"Triangle created with\nA = [{A.x},{A.y}]\nB = [{B.x},{B.y}]\nC = [{C.x},{C.y}]")
+        print(f"\t|Triangle created with\nA = [{A.x},{A.y}]\nB = [{B.x},{B.y}]\nC = [{C.x},{C.y}]")
 
 def calculate_vert(vert, camera):
-    near = camera.near
-    far = camera.far
-    fov = camera.fov
-    x, y, z = vert
-    Rfov = 1 / np.tan(fov * 0.5 * 3.1459 / 180 )
-    screenX, screenY = turtle.screensize()
-    aspect_ratio = screenX/screenY
+    print(f"Started def calculate_vert:")
+    Px, Py, Pz = vert
 
-    S = 1 / (np.tan((fov/2)*(3.1415926/180)))
+    dX, dY, dZ = 1,1,1
+    print(f"\t| Vert: {vert}")
+    print(f"\t| Camera cords: {camera.x}, {camera.y}, {camera.z}")
 
-    print(f"Far = {far}, near = {near} \n {far/(far - near)}")
 
-    matProj = Mat4([
-        S, 0,0,0,
-        0, S, 0,0,
-        0,0,(far * -1) / (far - near),-1,
-        0,0,((-1 * far) * near) / (far - near),0
-    ])
-    print(f"1{matProj[0,0]},{matProj[0,1]},{matProj[0,2]},{matProj[0,3]}\n"
-          f"2{matProj[1,0]},{matProj[1,1]},{matProj[1,2]},{matProj[1,3]}\n"
-          f"3{matProj[2,0]},{matProj[2,1]},{matProj[2,2]},{matProj[2,3]}\n"
-          f"4{matProj[3,0]},{matProj[3,1]},{matProj[3,2]},{matProj[3,3]}\n")
+    dZ = Pz - camera.z
+    dY = Py - camera.y
+    dX = Px - camera.x
 
-    projFace = multmat4(Vec3(x,z,y), matProj)
 
-    print(f"2D Y = {projFace.y * 0.5 * screenY}")
+    if dY != 0:
+        Yprime = round(camera.near * (dZ / dY),1)
+        Xprime = round(camera.near * (dX / dY),1)
+        #Xprime = 0
+    else:
+        Yprime = camera.near
+        Xprime = camera.near
 
-    return Vec2(projFace.x * 0.5 * screenX,projFace.y * 0.5 * screenY)
 
-def multmat4(i, m):
-    o = Vec3(0,0,0)
-    o.x = i.x * m[0,0] + i.y * m[1,0] + i.z * m[2,0] + m[3,0]
-    o.y = i.x * m[0,1] + i.y * m[1,1] + i.z * m[2,1] + m[3,1]
-    o.z = i.x * m[0,2] + i.y * m[1,2] + i.z * m[2,2] + m[3,2]
-    w =   i.x * m[0,3] + i.y * m[1,3] + i.z * m[2,3] + m[3,3]
-    if (w != 0):
-        o.x /= w
-        o.y /= w
-        o.z /= w
-        print("Dividing")
+    print(f"\t| screen-space X,Y = {Xprime, Yprime}")
+    return Vec2(Xprime, Yprime)
 
-    return (o)
 
 def flatten_face(face: Face, camera: Camera): #Returns a Triangle which is sceenspace equivalent of the face
     points = []
     v = face.verts
-    vmat = [0,0,0,
-         0,0,0,
-         0,0,0,]
-    n = camera.near
-    f = camera.far
-
-    #for i in range(3):
-        #y = verts[i,2]
-        #vmat[i * 3 + 0] = (verts[i,0] * n)
-        #vmat[i * 3 + 2] = (verts[i,2] * n)
-        #vmat[i * 3 + 1] = (verts[i,1] * ((f + n) * verts[i,1] - (f * n)))
-        #print(f"{i} succeeded")
-
-    #v = Mat3([vmat[0], vmat[1], vmat[2],
-              #vmat[3], vmat[4], vmat[5],
-              #vmat[6], vmat[7], vmat[8],])
-
     #Calculate each vert's screenspace equivalent
     points = [calculate_vert((v[0,0],v[0,1],v[0,2]), camera),
               calculate_vert((v[1,0],v[1,1],v[1,2]), camera),
@@ -216,27 +183,31 @@ def draw_triangle(tri, face):
 
 
 
+
+
+
+
+print("Running mainloop:")
+
+
 points = Mat3([
         0, 10, 0,
-        0, 10, 50,
-        50, 10, 50
+        0, 10, 1000,
+        1000, 10, 1000
     ])
 
 
 
 face = Face(points)
-print(f"World space points = \n{face.verts}")
+print(f"\t| World space points = \n{face.verts}")
+
+
 camera = Camera(0,0,0, 1, 2000, 90)
-print(f"Camera at {camera.x},{camera.y},{camera.z}")
-
-frames = []
-
-fps = 60
-i = int(0)
-dance = int(0)
+print(f"\t| Camera at {camera.x},{camera.y},{camera.z}")
 
 
-print(f"World space points after translation = \n{face.verts}")
+
+
 
 
 def on_motion(event):
@@ -269,7 +240,10 @@ mouse_x, mouse_y = 0,0
 cords = []
 turtle.getcanvas().bind("<Motion>", on_motion)
 
-
+frames = []
+fps = 60
+i = int(0)
+print("Started mainloop:")
 running = True
 while running:
     i += 1
@@ -292,15 +266,15 @@ while running:
     turtle.update()
     if i % 60 == 0:
         #face.Rotate('y', 1)
-        #camera.Translate(100,0,0)
+        camera.Translate(0,0,0)
         #print(camera.x)
         #camera.Rotate('y', 20)
         end_time = time.time()
         try:
             fps = round((fps + (60 / (end_time - start_time))) / 2, 1)
-            print(f"FPS: {fps}")
+            print(f"\t| FPS: {fps}")
         except:
-            print("Loading FPS")
+            print("\t| Loading FPS")
         start_time = time.time()
 
 
