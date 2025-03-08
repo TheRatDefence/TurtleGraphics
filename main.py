@@ -74,22 +74,36 @@ class Camera:
         self.focal_point = focal_point
         self.near = near
         self.far = far
-        self.fov = fov
+        self.fov = np.radians(fov)
+        self.hfov = np.radians(fov/2)
 
 
         #Creating screen plane
-        self.A = Vec3(focal_point.x + ((screen.width/2)/(np.tan(fov/2))),(focal_point.y + ((screen.height/2)/(np.tan(fov/2)))),focal_point.z + (screen.height/2))
-        self.B = Vec3(focal_point.x + ((screen.width / 2) / (np.tan(fov / 2))),(focal_point.y + ((screen.height / 2) / (np.tan(fov / 2)))), focal_point.z)
-        self.C = Vec3(focal_point.x + ((screen.width / 2) / (np.tan(fov / 2))) * -1,(focal_point.y + ((screen.height / 2) / (np.tan(fov / 2)))), focal_point.z)
+        self.A = Vec3(focal_point.x + ((screen.width/2)/(np.tan(self.hfov))),(focal_point.y + ((screen.height/2)/(np.tan(self.hfov)))),focal_point.z + (screen.height/2))
+        self.B = Vec3(focal_point.x + ((screen.width / 2) / (np.tan(self.hfov))),(focal_point.y + ((screen.height / 2) / (np.tan(self.hfov)))), focal_point.z)
+        self.C = Vec3(focal_point.x + ((screen.width / 2) / (np.tan(self.hfov))) * -1,(focal_point.y + ((screen.height / 2) / (np.tan(self.hfov)))), focal_point.z)
 
-        self.focal_length = Vec3()
+        self.focal_length = (screen.height/2)/(np.tan(self.hfov))
+        print(f"Camera init:\n\t|Focal length = {self.focal_length}\n\t|Tan(fov/2) = {np.tan(self.hfov)}")
 
 
     def Translate(self, X, Y, Z):
-        v = self
-        v.x += X
-        v.y += Y
-        v.z += Z
+        c = self
+        c.focal_point.x += X
+        c.focal_point.y += Y
+        c.focal_point.z += Z
+
+        c.A.x += X
+        c.B.x += X
+        c.C.x += X
+
+        c.A.y += Y
+        c.B.y += Y
+        c.C.y += Y
+
+        c.A.z += Z
+        c.B.z += Z
+        c.C.z += Z
 
 
     def Rotate(self, axis, radians):
@@ -127,28 +141,51 @@ class Triangle:
         self.verts = [A,B,C]
         #print(f"\t|Triangle created with\nA = [{A.x},{A.y}]\nB = [{B.x},{B.y}]\nC = [{C.x},{C.y}]")
 
-def calculate_vert(vert, camera, screen):
-    #print(f"Started def calculate_vert:")
+def calculate_vert(vert: Vec3, camera, screen):
+    point = vert
     n = camera.near
     far = camera.far
-    fov = camera.fov
+    fov = camera.hfov
     point_prime = Vec3(0,0,0)
+    f = camera.focal_length
+    focal_point = camera.focal_point
 
     #Y and Z
 
     #Get the camera angle
-    offset_angle = fov/2 - np.arctan((camera.A.z - camera.focal_point.z)/camera.A.y - camera.focal_point.y)
+    offset_angle = np.degrees(fov) - np.degrees(np.arctan((camera.A.z - camera.focal_point.z)/(camera.A.y - camera.focal_point.y)))
 
     #Rotate point
-    rotated_point = rotate_point(offset_angle, vert.y, vert.z)
-    point_prime.y =
+    rotated_y,rotated_z = rotate_point(np.radians(offset_angle), point.y, point.z)
+
+    #Calculate angle
+    angle = np.arctan((rotated_z - focal_point.z)/(rotated_y - focal_point.y))
+
+    #Calculate screenspace equivalent
+    point_prime.z = f * np.arctan(angle)
+
+    #X and Z
+    #Get the camera angle
+    offset_angle = np.degrees(fov) - np.degrees(np.arctan((camera.A.z - focal_point.z)/(camera.A.x - focal_point.x)))
+
+    #Rotate point
+    rotated_x,rotated_z = rotate_point(np.radians(offset_angle), point.x, point.z)
+
+    #Calculate angle
+    if rotated_x != 0 and rotated_z != 0:
+        angle = np.arctan((rotated_z - focal_point.z)/(rotated_x - focal_point.x))
+    else:
+        angle = 0
+    #Calculate screenspace equivalent
+    point_prime.x = f * np.arctan(angle)
 
 
+    point_prime.y = rotated_y * (far/(far - n)) - ((far * n)/(far - n))
 
-
-
-    Zprime = dZ * (far/(far - n)) - ((far * n)/(far - n))
-
+    if point_prime.x != 0:
+        point_prime.x = screen.width / point_prime.x
+    if point_prime.z != 0:
+        point_prime.z = screen.height / point_prime.z
 
     #print(f"\t| screen-space X,Y = {Xprime, Yprime}")
     return point_prime
@@ -164,9 +201,9 @@ def flatten_face(face: Face, camera: Camera, screen): #Returns a Triangle which 
     v = face.verts
 
     #Calculate each vert's screenspace equivalent
-    points = [calculate_vert((v[0,0],v[0,1],v[0,2]), camera, screen),
-              calculate_vert((v[1,0],v[1,1],v[1,2]), camera, screen),
-              calculate_vert((v[2,0],v[2,1],v[2,2]), camera, screen)]
+    points = [calculate_vert(Vec3(v[0,0],v[0,1],v[0,2]), camera, screen),
+              calculate_vert(Vec3(v[1,0],v[1,1],v[1,2]), camera, screen),
+              calculate_vert(Vec3(v[2,0],v[2,1],v[2,2]), camera, screen)]
 
 
 
@@ -176,7 +213,6 @@ def draw_triangle(tri, face):
     #Assign vars
     t = tri.turtle
     verts = tri.verts
-
     #Lift pen and begin fill
     t.clear()
     t.up()
@@ -190,7 +226,15 @@ def draw_triangle(tri, face):
         wZ = face.verts[i,2]
 
 
-        t.goto(vert.x,vert.y)
+
+
+
+        if (vert.x < 1) and (vert.x > -1) and (vert.z < 1) and (vert.z > -1):
+            x = screen.width * vert.x
+            z = screen.height * vert.z
+            print(f"({vert.x}),({vert.z})")
+            t.goto(x,z)
+
 
         colour = face.colour
         t.color(0, 0, 0)
@@ -221,16 +265,12 @@ camera = Camera(Vec3(0,0,0),1,2000, 90, screen)
 
 points = Mat3([
         0, 10, 0,
-        0, 10, 1000,
-        1000, 10, 1000
+        0, 10, 200,
+        200, 10, 200
     ])
 
 face = Face(points)
 #print(f"\t| World space points = \n{face.verts}")
-
-
-
-
 
 
 
@@ -285,12 +325,13 @@ while running:
         turtle.turtles().remove(frames[1].turtle)
         frames.pop(1)
 
-
-
+    #camera.Translate(0, 0, 0)
+    #face.Translate(0,5,0)
     turtle.update()
     if i % 60 == 0:
-        face.Rotate('y', 1)
-        #camera.Translate(100,0,0)
+        #face.Rotate('y', 1)
+
+
         #print(camera.x)
         #camera.Rotate('y', 20)
         end_time = time.time()
