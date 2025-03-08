@@ -243,7 +243,7 @@ def check_if_in_cameraspace(vert, screen):
 
         # print(f"({vert.x}),({vert.z})")
 
-        write_x = round(x, 4)
+        write_x = round(x, 1)
 
     else:
         if vert.x > 1:
@@ -256,7 +256,7 @@ def check_if_in_cameraspace(vert, screen):
         print("Off screen")
     if (vert.z < 1) and (vert.z > -1):
         z = vert.z * screen.height
-        write_z = round(z, 4)
+        write_z = round(z, 1)
     else:
         if vert.z > 1:
             z = 1 * screen.height
@@ -298,7 +298,7 @@ def draw_triangle(tri, face):
         colour = face.colour
         t.color(0, 0, 0)
 
-        t.write(f"{write_x}, {round(wY,4)}, {write_z}")
+        t.write(f"{write_x}, {round(wY,1)}, {write_z}")
 
         t.color(colour)
 
@@ -323,6 +323,7 @@ def rotate_face(face, frame, lastframe):
     lx, ly = lastframe
     dx, dy = x - lx, y - ly
     face.Rotate('z', dx)
+    face.Rotate('y', dy)
 def rotate_camera(camera, frame, lastframe):
     x, y = frame
     lx, ly = lastframe
@@ -340,13 +341,13 @@ print("Running mainloop:")
 
 
 
-screen = Screen(1500,1000)
+screen = Screen(800,800)
 
-camera = Camera(Vec3(0,0,0),1,2000, 90, screen)
+camera = Camera(Vec3(0,-30,0),1,2000, 90, screen)
 #print(f"\t| Camera at {camera.x},{camera.y},{camera.z}")
 
 points = Mat3([
-        0, 20, 0,
+        0, 0, 0,
         0, 20, 10,
         10, 20, 10
     ])
@@ -383,8 +384,8 @@ while running:
         turtle.turtles().remove(frames[1].turtle)
         frames.pop(1)
 
-    #face.Rotate('y', 90)
-    face.Translate(0.1, 0, 0)
+    #face.Rotate('x', 0.2)
+    #face.Translate(0.1, 0, 0)
     turtle.update()
     if i % 60 == 0:
         #face.Rotate('y', 1)
