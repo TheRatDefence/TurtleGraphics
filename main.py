@@ -41,10 +41,11 @@ class Screen:
 
 #3D Face
 class Face:
-    def __init__(self, p):
+    def __init__(self, p: Mat3):
         #Asign verts
         self.verts = p
         self.colour = (r.randint(0, 255), r.randint(0, 255), r.randint(0, 255))
+        self.midpoint = Face.get_mid_point(self)
 
     def Translate(self, X, Y, Z):
         v = self.verts
@@ -54,8 +55,21 @@ class Face:
             v[2, 0] + X, v[2, 1] + Y, v[2, 2] + Z
         ])
 
-    def Rotate(self, axis, radians):
+    def Rotate(self, axis: str, radians, origin: Vec3):
         angle = np.radians(radians)
+
+        A = Vec3(self.verts[0, 0], self.verts[0, 1], self.verts[0, 2])
+        B = Vec3(self.verts[1, 0], self.verts[1, 1], self.verts[1, 2])
+        C = Vec3(self.verts[2, 0], self.verts[2, 1], self.verts[2, 2])
+
+        print(f"Before: {A}, {B}, {C}")
+
+        #T = Mat3([
+        #    1,0,normX,
+        #    0,1,normY,
+        #    0,0,1+normZ
+        #])
+
         if axis == 'x':
             R = Mat3([
                 1,          0,          0,
@@ -75,13 +89,39 @@ class Face:
                 0,                  0,                      1
             ])
 
-        A = R * Vec3(self.verts[0,0],self.verts[0,1],self.verts[0,2],)
-        B = R * Vec3(self.verts[1,0],self.verts[1,1],self.verts[1,2],)
-        C = R * Vec3(self.verts[2,0],self.verts[2,1],self.verts[2,2],)
 
-        self.verts = Mat3([ A.x,A.y,A.z,
-                            B.x,B.y,B.z,
-                            C.x,C.y,C.z])
+        #invT = Mat3([
+        #    1,0,-1*normX,
+        #    0,1,-1*normY,
+        #    0,0,-1*normZ
+        #])
+
+
+        A = Vec3(A.x - origin.x,A.y - origin.y,A.z - origin.z)
+        B = Vec3(B.x - origin.x,B.y - origin.y,B.z - origin.z)
+        C = Vec3(C.x - origin.x,C.y - origin.y,C.z - origin.z)
+
+        A = R * A
+        B = R * B
+        C = R * C
+
+        A = Vec3(A.x + origin.x, A.y + origin.y, A.z + origin.z)
+        B = Vec3(B.x + origin.x, B.y + origin.y, B.z + origin.z)
+        C = Vec3(C.x + origin.x, C.y + origin.y, C.z + origin.z)
+
+        self.verts = Mat3([A.x,A.y,A.z,
+                           B.x,B.y,B.z,
+                           C.x,C.y,C.z])
+
+        print(f"After: {A}, {B}, {C}")
+
+
+    def get_mid_point(self):
+        x = self.verts[0,0] + self.verts[1,0] + self.verts[2,0]
+        y = self.verts[0,1] + self.verts[1,1] + self.verts[2,1]
+        z = self.verts[0,2] + self.verts[1,2] + self.verts[2,2]
+        return Vec3(x/3,y/3,z/3)
+
 
 
 #3D Camera
@@ -90,8 +130,8 @@ class Camera:
         self.focal_point = focal_point
         self.near = near
         self.far = far
-        self.fov = np.radians(fov)
-        self.hfov = np.radians(fov/2)
+        self.fov = np.radians(180 - fov)
+        self.hfov = np.radians((180 - fov)/2)
 
 
         #Creating screen plane
@@ -180,12 +220,12 @@ def calculate_vert(vert: Vec3, camera, screen):
     rotated_y,rotated_z = rotate_point(np.radians(offset_angle), point.y, point.z)
 
     #Calculate angle
+    riseZ = (rotated_z - focal_point.z)
+    runZ = (rotated_y - focal_point.y)
     if rotated_y != 0 and rotated_z != 0:
-        riseZ = (rotated_z - focal_point.z)
-        runZ = (rotated_y - focal_point.y)
         angleZ = (riseZ/runZ)
     else:
-        angleZ = 0
+        angleZ = ((riseZ + 1)/ (runZ + 1))
 
     #Calculate screenspace equivalent
     point_prime.z = f * angleZ
@@ -198,12 +238,12 @@ def calculate_vert(vert: Vec3, camera, screen):
     rotated_x,rotated_y = rotate_point(np.radians(offset_angle), point.x, point.y)
 
     #Calculate angle
+    riseX = (rotated_x - focal_point.x)
+    runX = (rotated_y - focal_point.y)
     if rotated_x != 0 and rotated_y != 0:
-        riseX = (rotated_x - focal_point.x)
-        runX = (rotated_y - focal_point.y)
         angleX = (riseX/runX)
     else:
-        angleX = 0
+        angleX = (riseX + 1)/(runX + 1)
     #Calculate screenspace equivalent
     point_prime.x = f * angleX
 
@@ -322,8 +362,8 @@ def rotate_face(face, frame, lastframe):
     x, y = frame
     lx, ly = lastframe
     dx, dy = x - lx, y - ly
-    face.Rotate('z', dx)
-    face.Rotate('y', dy)
+    face.Rotate('z', dx, face.midpoint)
+    face.Rotate('x', dy, face.midpoint)
 def rotate_camera(camera, frame, lastframe):
     x, y = frame
     lx, ly = lastframe
@@ -343,13 +383,13 @@ print("Running mainloop:")
 
 screen = Screen(800,800)
 
-camera = Camera(Vec3(0,-30,0),1,2000, 90, screen)
+camera = Camera(Vec3(0,-15,0),1,2000, 46, screen)
 #print(f"\t| Camera at {camera.x},{camera.y},{camera.z}")
 
 points = Mat3([
         0, 0, 0,
-        0, 20, 10,
-        10, 20, 10
+        0, 0, 10,
+        10, 0, 10
     ])
 
 face = Face(points)
@@ -360,8 +400,8 @@ mouse_x, mouse_y = 0,0
 cords = []
 turtle.getcanvas().bind("<Motion>", on_motion)
 
-#face.Translate(0,0,0)
-
+face.Translate(0,0,0)
+#face.Rotate('x', 180, Vec3(5,0,0))
 
 frames = []
 fps = 60
@@ -383,12 +423,12 @@ while running:
         draw_triangle(frames[2], face)
         turtle.turtles().remove(frames[1].turtle)
         frames.pop(1)
-
-    #face.Rotate('x', 0.2)
-    #face.Translate(0.1, 0, 0)
+    midpoint = face.midpoint
+    print(midpoint)
+    #face.Rotate('z', 1,face.midpoint)
+    #face.Translate(0, -0.1, 0)
     turtle.update()
     if i % 60 == 0:
-        #face.Rotate('y', 1)
 
 
         #print(camera.x)
