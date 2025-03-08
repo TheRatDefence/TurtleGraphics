@@ -6,22 +6,38 @@ import numpy as np
 import random as r
 from bra import *
 
-def turtle_init():
+def turtle_init(colour):
     t = turtle.Turtle()
     t.hideturtle()
     t.speed(0)
     t.screen.colormode(255)
-    t.color(face.colour)
+    t.color(colour)
     turtle.hideturtle()
     turtle.tracer(0)
     return t
 
 class Screen:
     def __init__(self, width, height):
-        turtle.screensize(width,height)
-        self.width = width
-        self.height = height
+        turtle.setup(width,height)
+        self.width = width / 2
+        self.height = height / 2
         self.aspect = width/height
+        #turtle.setworldcoordinates(-1, -1, 1, 1)
+        Screen.border(self)
+    def border(self):
+        t = turtle_init((0,0,0))
+        thick = 3
+        t.pensize(thick * 2)
+        h = self.height + thick
+        w = self.width + thick
+
+        t.teleport(-1 * w, -1 * h)
+        t.seth(90)
+        for i in range(2):
+            t.fd(h * 2)
+            t.right(90)
+            t.fd(w * 2)
+            t.right(90)
 
 #3D Face
 class Face:
@@ -106,8 +122,8 @@ class Camera:
         c.C.z += Z
 
 
-    def Rotate(self, axis, radians):
-        angle = np.radians(radians)
+    def Rotate(self, axis, degrees):
+        angle = np.radians(degrees)
         if axis == 'x':
             R = Mat3([
                 1,          0,          0,
@@ -135,7 +151,8 @@ class Triangle:
     def __init__(self, face, A: Vec2, B: Vec2, C: Vec2):
         #print("Started def Triangle: ")
         #Create Turtle and colour
-        self.turtle = turtle_init()
+        self.colour = (r.randint(0, 255), r.randint(0, 255), r.randint(0, 255))
+        self.turtle = turtle_init(self.colour)
 
         #Asign verts
         self.verts = [A,B,C]
@@ -150,42 +167,53 @@ def calculate_vert(vert: Vec3, camera, screen):
     f = camera.focal_length
     focal_point = camera.focal_point
 
+    normZ = camera.A.z - camera.focal_point.z
+    normY = camera.A.y - camera.focal_point.y
+    normX = camera.A.x - focal_point.x
+
     #Y and Z
 
     #Get the camera angle
-    offset_angle = np.degrees(fov) - np.degrees(np.arctan((camera.A.z - camera.focal_point.z)/(camera.A.y - camera.focal_point.y)))
+    offset_angle = fov - np.arctan((normZ)/(normY))
 
     #Rotate point
     rotated_y,rotated_z = rotate_point(np.radians(offset_angle), point.y, point.z)
 
     #Calculate angle
-    angle = np.arctan((rotated_z - focal_point.z)/(rotated_y - focal_point.y))
+    if rotated_y != 0 and rotated_z != 0:
+        riseZ = (rotated_z - focal_point.z)
+        runZ = (rotated_y - focal_point.y)
+        angleZ = (riseZ/runZ)
+    else:
+        angleZ = 0
 
     #Calculate screenspace equivalent
-    point_prime.z = f * np.arctan(angle)
+    point_prime.z = f * angleZ
 
-    #X and Z
+    #X and Y
     #Get the camera angle
-    offset_angle = np.degrees(fov) - np.degrees(np.arctan((camera.A.z - focal_point.z)/(camera.A.x - focal_point.x)))
+    offset_angle = fov - np.arctan(normY/normX)
 
     #Rotate point
-    rotated_x,rotated_z = rotate_point(np.radians(offset_angle), point.x, point.z)
+    rotated_x,rotated_y = rotate_point(np.radians(offset_angle), point.x, point.y)
 
     #Calculate angle
-    if rotated_x != 0 and rotated_z != 0:
-        angle = np.arctan((rotated_z - focal_point.z)/(rotated_x - focal_point.x))
+    if rotated_x != 0 and rotated_y != 0:
+        riseX = (rotated_x - focal_point.x)
+        runX = (rotated_y - focal_point.y)
+        angleX = (riseX/runX)
     else:
-        angle = 0
+        angleX = 0
     #Calculate screenspace equivalent
-    point_prime.x = f * np.arctan(angle)
+    point_prime.x = f * angleX
 
 
     point_prime.y = rotated_y * (far/(far - n)) - ((far * n)/(far - n))
 
-    if point_prime.x != 0:
-        point_prime.x = screen.width / point_prime.x
-    if point_prime.z != 0:
-        point_prime.z = screen.height / point_prime.z
+    #if point_prime.x != 0:
+    point_prime.x = (point_prime.x / screen.width)
+    #if point_prime.z != 0:
+    point_prime.z = (point_prime.z / screen.height)
 
     #print(f"\t| screen-space X,Y = {Xprime, Yprime}")
     return point_prime
@@ -209,6 +237,38 @@ def flatten_face(face: Face, camera: Camera, screen): #Returns a Triangle which 
 
     return Triangle(face, points[0], points[1], points[2])
 
+def check_if_in_cameraspace(vert, screen):
+    if (vert.x < 1) and (vert.x > -1):
+        x = (vert.x * screen.width)
+
+        # print(f"({vert.x}),({vert.z})")
+
+        write_x = round(x, 4)
+
+    else:
+        if vert.x > 1:
+            x = 1 * screen.width
+            write_x = ' '
+        elif vert.x < -1:
+            x = -1 * screen.width
+            write_x = ' '
+
+        print("Off screen")
+    if (vert.z < 1) and (vert.z > -1):
+        z = vert.z * screen.height
+        write_z = round(z, 4)
+    else:
+        if vert.z > 1:
+            z = 1 * screen.height
+            write_z = ' '
+        elif vert.z < -1:
+            z = -1 * screen.height
+            write_z = ' '
+        print("Off screen")
+
+
+    return x,z,write_x,write_z
+
 def draw_triangle(tri, face):
     #Assign vars
     t = tri.turtle
@@ -218,7 +278,9 @@ def draw_triangle(tri, face):
     t.up()
     t.begin_fill()
 
-    t.teleport(verts[-1].x,verts[-1].y)
+    tempx,tempz,_,_ = check_if_in_cameraspace(verts[-1], screen)
+
+    t.teleport(tempx,tempz)
     i = 0
     for vert in verts:
         wX = face.verts[i,0]
@@ -229,17 +291,14 @@ def draw_triangle(tri, face):
 
 
 
-        if (vert.x < 1) and (vert.x > -1) and (vert.z < 1) and (vert.z > -1):
-            x = screen.width * vert.x
-            z = screen.height * vert.z
-            print(f"({vert.x}),({vert.z})")
-            t.goto(x,z)
+        x,z,write_x,write_z = check_if_in_cameraspace(vert, screen)
 
+        t.goto(x, z)
 
         colour = face.colour
         t.color(0, 0, 0)
 
-        t.write(f"{round(wX)}, {round(wY)}, {round(wZ)}")
+        t.write(f"{write_x}, {round(wY,4)}, {write_z}")
 
         t.color(colour)
 
@@ -247,30 +306,6 @@ def draw_triangle(tri, face):
 
     #End fill
     t.end_fill()
-
-
-
-
-
-
-
-print("Running mainloop:")
-
-
-
-screen = Screen(1000,1000)
-
-camera = Camera(Vec3(0,0,0),1,2000, 90, screen)
-#print(f"\t| Camera at {camera.x},{camera.y},{camera.z}")
-
-points = Mat3([
-        0, 10, 0,
-        0, 10, 200,
-        200, 10, 200
-    ])
-
-face = Face(points)
-#print(f"\t| World space points = \n{face.verts}")
 
 
 
@@ -300,9 +335,32 @@ def move_camera(camera, frame, lastframe):
     camera.Translate(dx * 0.01, dy * 0.01, 0)
 
 
+
+print("Running mainloop:")
+
+
+
+screen = Screen(1500,1000)
+
+camera = Camera(Vec3(0,0,0),1,2000, 90, screen)
+#print(f"\t| Camera at {camera.x},{camera.y},{camera.z}")
+
+points = Mat3([
+        0, 20, 0,
+        0, 20, 10,
+        10, 20, 10
+    ])
+
+face = Face(points)
+#print(f"\t| World space points = \n{face.verts}")
+
+
 mouse_x, mouse_y = 0,0
 cords = []
 turtle.getcanvas().bind("<Motion>", on_motion)
+
+#face.Translate(0,0,0)
+
 
 frames = []
 fps = 60
@@ -325,8 +383,8 @@ while running:
         turtle.turtles().remove(frames[1].turtle)
         frames.pop(1)
 
-    #camera.Translate(0, 0, 0)
-    #face.Translate(0,5,0)
+    #face.Rotate('y', 90)
+    face.Translate(0.1, 0, 0)
     turtle.update()
     if i % 60 == 0:
         #face.Rotate('y', 1)
